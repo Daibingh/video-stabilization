@@ -58,7 +58,7 @@ public:
         this->cap = cap;
         this->play_scale = play_scale;
         this->ms_delay = ms_delay;
-//        qDebug()<<ms_delay;
+        //        qDebug()<<ms_delay;
     }
 
     ~Videoplayer()
@@ -78,7 +78,7 @@ public:
         avg_a.clear();
     }
 
- public slots:
+public slots:
     void play()
     {
 
@@ -115,7 +115,7 @@ public:
         double yy = 0;
         double aa = 0;
 
-        for(int i=1; i<n_frames-1; i++)
+        for(int i=1; i<n_frames-1+radius; i++)
         {
             while(stop)
             {
@@ -131,87 +131,91 @@ public:
                 return;
             }
 
-            vector<cv::Point2f> pts;
+            if(i < n_frames-1)
+            {
+                vector<cv::Point2f> pts;
+                double dx, dy, da;
 
-            double dx, dy, da;
-            // Read next frame
-            bool success = cap.read(curr);
-            if(!success) break;
-            Mat T = get_transT(prev, curr, pts);
+                // Read next frame
+                bool success = cap.read(curr);
+                if(!success) break;
+                Mat T = get_transT(prev, curr, pts);
 
-            pts_que.push(pts);
+                pts_que.push(pts);
 
-            if(T.data == NULL) last_T.copyTo(T);
-            T.copyTo(last_T);
-            dx = T.at<double>(0,2);
-            dy = T.at<double>(1,2);
-            da = atan2(T.at<double>(1,0), T.at<double>(0,0));
-            x.push_back(xx+=dx);
-            y.push_back(yy+=dy);
-            a.push_back(aa+=da);
+                if(T.data == NULL) last_T.copyTo(T);
+                T.copyTo(last_T);
+                dx = T.at<double>(0,2);
+                dy = T.at<double>(1,2);
+                da = atan2(T.at<double>(1,0), T.at<double>(0,0));
+                x.push_back(xx+=dx);
+                y.push_back(yy+=dy);
+                a.push_back(aa+=da);
     #ifdef write_data
-            f1<<i-1<<","<<x[i-1]<<","<<y[i-1]<<","<<a[i-1]<<endl;
+                f1<<i-1<<","<<x[i-1]<<","<<y[i-1]<<","<<a[i-1]<<endl;
     #endif
-            // Move to next frame
-            frames.push(prev.clone());  // use prev.clone() instead of prev, this is very important!!!
-            curr.copyTo(prev);
+                // Move to next frame
+                frames.push(prev.clone());  // use prev.clone() instead of prev, this is very important!!!
+                curr.copyTo(prev);
+            }
 
-//            cout<<i<<": "<<frames.size()<<endl;
-            if(frames.size()<=radius) continue;
+            //            cout<<i<<": "<<frames.size()<<endl;
+            if(i > radius)
+            {
+                Mat T2;
+                Mat frame_show_origin = frames.front();
+                Mat frame_show_origin_pts;
 
-            Mat frame_show_origin = frames.front();
-            Mat frame_show_origin_pts;
+                frame_show_origin.copyTo(frame_show_origin_pts);
+                draw_pornts(frame_show_origin_pts, pts_que.front());
 
-            frame_show_origin.copyTo(frame_show_origin_pts);
-            draw_pornts(frame_show_origin_pts, pts_que.front());
+                // real-time smooth
+                smooth_one_point(x, y, a, avg_x, avg_y, avg_a, radius);
 
-            // real-time smooth
-            smooth_one_point(x, y, a, avg_x, avg_y, avg_a, radius);
+                //            cout<<"x.size()="<<x.size()<<", "<<"avg_x.size()="<<avg_x.size()<<endl;
+                double dx_smoothed, dy_smoothed, da_smoothed;
+                int pos = i - radius-1;
+                dx_smoothed = avg_x[pos] + x[pos+1] - 2*x[pos];
+                dy_smoothed = avg_y[pos] + y[pos+1] - 2*y[pos];
+                da_smoothed = avg_a[pos] + a[pos+1] - 2*a[pos];
+                //            cout<<pos<<": "<<dx_smoothed<<", "<<dy_smoothed<<", "<<da_smoothed<<endl;
 
-            Mat T2;
-
-//            cout<<"x.size()="<<x.size()<<", "<<"avg_x.size()="<<avg_x.size()<<endl;
-            double dx_smoothed, dy_smoothed, da_smoothed;
-            int pos = x.size() - radius-1;
-            dx_smoothed = avg_x[pos] + x[pos+1] - 2*x[pos];
-            dy_smoothed = avg_y[pos] + y[pos+1] - 2*y[pos];
-            da_smoothed = avg_a[pos] + a[pos+1] - 2*a[pos];
-//            cout<<pos<<": "<<dx_smoothed<<", "<<dy_smoothed<<", "<<da_smoothed<<endl;
-
-            T2 = getTransform(dx_smoothed, dy_smoothed, da_smoothed);
+                T2 = getTransform(dx_smoothed, dy_smoothed, da_smoothed);
     #ifdef write_data
-            f2<<pos<<","<<avg_x[pos]<<","<<avg_y[pos]<<","<<avg_a[pos]<<endl;
-            f3<<pos<<","<<dx_smoothed<<","<<dy_smoothed<<","<<da_smoothed<<endl;
-            f4<<T2<<endl;
+                f2<<pos<<","<<avg_x[pos]<<","<<avg_y[pos]<<","<<avg_a[pos]<<endl;
+                f3<<pos<<","<<dx_smoothed<<","<<dy_smoothed<<","<<da_smoothed<<endl;
+                f4<<T2<<endl;
     #endif
-            warpAffine(frame_show_origin, frame_stabilized, T2, frame_show_origin.size(), INTER_LINEAR, BORDER_REPLICATE);
+                warpAffine(frame_show_origin, frame_stabilized, T2, frame_show_origin.size(), INTER_LINEAR, BORDER_REPLICATE);
 
 
-            // Scale image to remove black border artifact
-            fixBorder(frame_stabilized);
+                // Scale image to remove black border artifact
+                fixBorder(frame_stabilized);
 
-//            cv::resize(frame, scaled_frame, cv::Size(0, 0), play_scale, play_scale);
-            cv::resize(frame_show_origin_pts, scaled_frame, cv::Size(0, 0), play_scale, play_scale);
-            img = QImage(scaled_frame.data, scaled_frame.cols, scaled_frame.rows, scaled_frame.step, QImage::Format_RGB888);
-            cv::resize(frame_stabilized, scaled_frame_2, cv::Size(0, 0), play_scale, play_scale);
-//            img = QImage(scaled_frame.data, scaled_frame.cols, scaled_frame.rows, scaled_frame.step, QImage::Format_RGB888);
-            img_2 = QImage(scaled_frame_2.data, scaled_frame_2.cols, scaled_frame_2.rows, scaled_frame_2.step, QImage::Format_RGB888);
+                //            cv::resize(frame, scaled_frame, cv::Size(0, 0), play_scale, play_scale);
+                cv::resize(frame_show_origin_pts, scaled_frame, cv::Size(0, 0), play_scale, play_scale);
+                img = QImage(scaled_frame.data, scaled_frame.cols, scaled_frame.rows, scaled_frame.step, QImage::Format_RGB888);
+                cv::resize(frame_stabilized, scaled_frame_2, cv::Size(0, 0), play_scale, play_scale);
+                //            img = QImage(scaled_frame.data, scaled_frame.cols, scaled_frame.rows, scaled_frame.step, QImage::Format_RGB888);
+                img_2 = QImage(scaled_frame_2.data, scaled_frame_2.cols, scaled_frame_2.rows, scaled_frame_2.step, QImage::Format_RGB888);
 
-//            emit img_ready(img, x.data(), y.data(), a.data(), i-radius);
-            emit process_ready(img, img_2, avg_x.data(), avg_y.data(), avg_a.data(), i-radius-1);
-            QThread::msleep(20);
+                //            emit img_ready(img, x.data(), y.data(), a.data(), i-radius);
+                emit process_ready(img, img_2, avg_x.data(), avg_y.data(), avg_a.data(), i-radius-1);
+                QThread::msleep(20);
 
-            frames.pop();
-            pts_que.pop();
+                frames.pop();
+                pts_que.pop();
+            }
+
 
         }
         emit finished();
 
 #ifdef write_data
-      f1.close();
-      f2.close();
-      f3.close();
-      f4.close();
+        f1.close();
+        f2.close();
+        f3.close();
+        f4.close();
 #endif
     }
 
@@ -224,7 +228,7 @@ signals:
 
 class MainWindow: public QMainWindow
 {
-     Q_OBJECT
+    Q_OBJECT
 public:
     explicit MainWindow(QWidget* parent=0);
     ~MainWindow();
@@ -274,7 +278,7 @@ public slots:
 signals:
     void start();
 protected:
-     void closeEvent(QCloseEvent *event);
+    void closeEvent(QCloseEvent *event);
 };
 
 #endif // MAINWINDOW_H
