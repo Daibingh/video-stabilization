@@ -17,6 +17,7 @@
 #include "utils.hpp"
 #include "dialog.h"
 #include <QCloseEvent>
+#include <queue>
 
 
 const int SMOOTHING_RADIUS = 50; // In frames. The larger the more stable the video, but less reactive to sudden panning
@@ -79,6 +80,8 @@ public:
     {
         clear_data();
 
+        queue<Mat> frames;
+
         cap.set(CV_CAP_PROP_POS_FRAMES, 0);
         int n_frames = int(cap.get(CAP_PROP_FRAME_COUNT));
 
@@ -109,12 +112,18 @@ public:
                 clear_data();
                 return;
             }
+
+            queue<vector<cv::Point2f> > pts_que;
+
             vector<cv::Point2f> pts;
             double dx, dy, da;
             // Read next frame
             bool success = cap.read(curr);
             if(!success) break;
             Mat T = get_transT(prev, curr, pts);
+
+            pts_que.push(pts);
+
             if(T.data == NULL) last_T.copyTo(T);
             T.copyTo(last_T);
             dx = T.at<double>(0,2);
@@ -124,67 +133,103 @@ public:
             y.push_back(yy+=dy);
             a.push_back(aa+=da);
 
-            qDebug()<<i<<": "<<x[i-1]<<", "<<y[i-1]<<", "<<a[i-1];
+//            qDebug()<<i<<": "<<x[i-1]<<", "<<y[i-1]<<", "<<a[i-1];
 
             // Move to next frame
             curr.copyTo(prev);
 
-            draw_pornts(curr, pts);
+            frames.push(curr);
 
-            cv::resize(curr, scaled_frame, cv::Size(0, 0), play_scale, play_scale);
+            cout<<i<<": "<<frames.size()<<endl;
+            if(i<=radius) continue;
+
+            Mat frame_show_origin = frames.front();
+            Mat frame_show_origin_pts;
+            frame_show_origin.copyTo(frame_show_origin_pts);
+            draw_pornts(frame_show_origin_pts, pts_que.front());
+
+            cv::resize(frame_show_origin_pts, scaled_frame, cv::Size(0, 0), play_scale, play_scale);
             img = QImage(scaled_frame.data, scaled_frame.cols, scaled_frame.rows, scaled_frame.step, QImage::Format_RGB888);      
 
-            emit img_ready(img, x.data(), y.data(), a.data(), i);
-            QThread::msleep(5);
-        }
 
-        smooth(x, y, a, avg_x, avg_y, avg_a, radius);
-        cout<<"radius in player: "<<radius<<endl;
-        cap.set(CV_CAP_PROP_POS_FRAMES, 0);
-        Mat T;
+            // real-time smooth
+            smooth_one_point(x, y, a, avg_x, avg_y, avg_a, radius);
+//            Mat T;
 
-        for( int i = 0; i < x.size()-1; i++)
-        {
-            while(stop)
-            {
-                if(reset)
-                {
-                    clear_data();
-                    return;
-                }
-            }
-            if(reset)
-            {
-                clear_data();
-                return;
-            }
-            bool success = cap.read(frame);
-            if(!success) break;
-
-            // Extract transform from translation and rotation angle.
+            cout<<"x.size()="<<x.size()<<", "<<"avg_x.size()="<<avg_x.size()<<endl;
             double dx_smoothed, dy_smoothed, da_smoothed;
-            dx_smoothed = avg_x[i] + x[i+1] - 2*x[i];
-            dy_smoothed = avg_y[i] + y[i+1] - 2*y[i];
-            da_smoothed = avg_a[i] + a[i+1] - 2*a[i];
-//            dx_smoothed = avg_x[i+1] - avg_x[i];
-//            dy_smoothed = avg_y[i+1] - avg_y[i];
-//            da_smoothed = avg_a[i+1] - avg_a[i];
-            cout<<i<<": "<<dx_smoothed<<", "<<dy_smoothed<<", "<<da_smoothed<<endl;
+            int pos = x.size() - radius-1;
+            dx_smoothed = avg_x[pos] + x[pos+1] - 2*x[pos];
+            dy_smoothed = avg_y[pos] + y[pos+1] - 2*y[pos];
+            da_smoothed = avg_a[pos] + a[pos+1] - 2*a[pos];
+            cout<<pos<<": "<<dx_smoothed<<", "<<dy_smoothed<<", "<<da_smoothed<<endl;
             T = getTransform(dx_smoothed, dy_smoothed, da_smoothed);
 
-            // Apply affine wrapping to the given frame
-            warpAffine(frame, frame_stabilized, T, frame.size(), INTER_LINEAR, BORDER_REPLICATE);
+            warpAffine(frame_show_origin, frame_stabilized, T, frame.size(), INTER_LINEAR, BORDER_REPLICATE);
 
             // Scale image to remove black border artifact
             fixBorder(frame_stabilized);
 
-            cv::resize(frame, scaled_frame, cv::Size(0, 0), play_scale, play_scale);
+//            cv::resize(frame, scaled_frame, cv::Size(0, 0), play_scale, play_scale);
             cv::resize(frame_stabilized, scaled_frame_2, cv::Size(0, 0), play_scale, play_scale);
-            img = QImage(scaled_frame.data, scaled_frame.cols, scaled_frame.rows, scaled_frame.step, QImage::Format_RGB888);
+//            img = QImage(scaled_frame.data, scaled_frame.cols, scaled_frame.rows, scaled_frame.step, QImage::Format_RGB888);
             img_2 = QImage(scaled_frame_2.data, scaled_frame_2.cols, scaled_frame_2.rows, scaled_frame_2.step, QImage::Format_RGB888);
-            emit process_ready(img, img_2, avg_x.data(), avg_y.data(), avg_a.data(), i);
-            QThread::msleep(ms_delay);
+
+//            emit img_ready(img, x.data(), y.data(), a.data(), i-radius);
+            emit process_ready(img, img_2, avg_x.data(), avg_y.data(), avg_a.data(), i-radius-1);
+            QThread::msleep(15);
+
+            frames.pop();
+            pts_que.pop();
         }
+
+//        smooth(x, y, a, avg_x, avg_y, avg_a, radius);
+//        cout<<"radius in player: "<<radius<<endl;
+//        cap.set(CV_CAP_PROP_POS_FRAMES, 0);
+//        Mat T;
+
+//        for( int i = 0; i < x.size()-1; i++)
+//        {
+//            while(stop)
+//            {
+//                if(reset)
+//                {
+//                    clear_data();
+//                    return;
+//                }
+//            }
+//            if(reset)
+//            {
+//                clear_data();
+//                return;
+//            }
+//            bool success = cap.read(frame);
+//            if(!success) break;
+
+//            // Extract transform from translation and rotation angle.
+//            double dx_smoothed, dy_smoothed, da_smoothed;
+//            dx_smoothed = avg_x[i] + x[i+1] - 2*x[i];
+//            dy_smoothed = avg_y[i] + y[i+1] - 2*y[i];
+//            da_smoothed = avg_a[i] + a[i+1] - 2*a[i];
+////            dx_smoothed = avg_x[i+1] - avg_x[i];
+////            dy_smoothed = avg_y[i+1] - avg_y[i];
+////            da_smoothed = avg_a[i+1] - avg_a[i];
+//            cout<<i<<": "<<dx_smoothed<<", "<<dy_smoothed<<", "<<da_smoothed<<endl;
+//            T = getTransform(dx_smoothed, dy_smoothed, da_smoothed);
+
+//            // Apply affine wrapping to the given frame
+//            warpAffine(frame, frame_stabilized, T, frame.size(), INTER_LINEAR, BORDER_REPLICATE);
+
+//            // Scale image to remove black border artifact
+//            fixBorder(frame_stabilized);
+
+//            cv::resize(frame, scaled_frame, cv::Size(0, 0), play_scale, play_scale);
+//            cv::resize(frame_stabilized, scaled_frame_2, cv::Size(0, 0), play_scale, play_scale);
+//            img = QImage(scaled_frame.data, scaled_frame.cols, scaled_frame.rows, scaled_frame.step, QImage::Format_RGB888);
+//            img_2 = QImage(scaled_frame_2.data, scaled_frame_2.cols, scaled_frame_2.rows, scaled_frame_2.step, QImage::Format_RGB888);
+//            emit process_ready(img, img_2, avg_x.data(), avg_y.data(), avg_a.data(), i);
+//            QThread::msleep(ms_delay);
+//        }
         emit finished();
     }
 

@@ -93,6 +93,32 @@ inline void smooth(const vector<double>& x, const vector<double>& y, const vecto
 
 }
 
+inline void smooth_one_point(const vector<double>& x, const vector<double>& y, const vector<double>& a,
+                   vector<double>& avg_x, vector<double>& avg_y, vector<double>& avg_a, int radius)
+{
+     double sum_x = 0;
+     double sum_y = 0;
+     double sum_a = 0;
+     int count = 0;
+
+     int pos = x.size()-radius-1;
+
+     for(int j=-radius; j <= radius; j++) {
+         if(pos+j >= 0 && pos+j < x.size()) {
+             sum_x += x[pos+j];
+             sum_y += y[pos+j];
+             sum_a += a[pos+j];
+
+             count++;
+         }
+     }
+
+     avg_a.push_back(sum_a / count);
+     avg_x.push_back(sum_x / count);
+     avg_y.push_back(sum_y / count);
+
+}
+
 inline Mat getTransform(double dx, double dy, double da)
 {
     Mat T(2,3,CV_64F);
