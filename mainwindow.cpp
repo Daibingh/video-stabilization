@@ -76,7 +76,7 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent), ui(new Ui_MainWind
 
     connect(&thread, &QThread::finished, player, &QObject::deleteLater);
     connect(this, &MainWindow::start, player, &Videoplayer::play); // 连接启动耗时操作的槽函数
-    connect(player, &Videoplayer::img_ready, this, &MainWindow::show_img); // 连接耗时操作完成的信号
+//    connect(player, &Videoplayer::img_ready, this, &MainWindow::show_img); // 连接耗时操作完成的信号
     connect(player, &Videoplayer::process_ready, this, &MainWindow::handle_process_ready); // 连接耗时操作完成的信号
     connect(player, &Videoplayer::finished, this, &MainWindow::handle_finished);
     thread.start(); // 启动新线程的事件循环
@@ -147,32 +147,36 @@ void MainWindow::on_actionstart_triggered()
    {
        isbusy = true;
        clear_plot();
-       player->set_info(cap, play_scale, 20);
+       player->set_info(cap, play_scale, 20, frame_width, frame_height, frame_rate);
        emit start();
    }
 }
 
-void MainWindow::show_img(const QImage& img, double* x, double* y, double* a, int frame_pos)
-{
-    ui->label->setPixmap(QPixmap::fromImage(img));
-    ui->horizontalSlider->setValue(frame_pos);
-    curve_11->setSamples(time_ticks, x, frame_pos);
-    curve_21->setSamples(time_ticks, y, frame_pos);
-    curve_31->setSamples(time_ticks, a, frame_pos);
-//    qDebug()<<frame_pos;
-    ui->qwtPlot->replot();
-    ui->qwtPlot_2->replot();
-    ui->qwtPlot_3->replot();
-}
+//void MainWindow::show_img(const QImage& img, double* x, double* y, double* a, int frame_pos)
+//{
+//    ui->label->setPixmap(QPixmap::fromImage(img));
+//    ui->horizontalSlider->setValue(frame_pos);
+//    curve_11->setSamples(time_ticks, x, frame_pos);
+//    curve_21->setSamples(time_ticks, y, frame_pos);
+//    curve_31->setSamples(time_ticks, a, frame_pos);
+////    qDebug()<<frame_pos;
+//    ui->qwtPlot->replot();
+//    ui->qwtPlot_2->replot();
+//    ui->qwtPlot_3->replot();
+//}
 
-void MainWindow::handle_process_ready(const QImage &img, const QImage& img_2, double *x, double *y, double *a, int frame_pos)
+void MainWindow::handle_process_ready(const QImage& img, const QImage& img_2, double* x, double* y, double* a,
+                                      double* avg_x, double* avg_y, double* avg_a, int frame_pos)
 {
     ui->label->setPixmap(QPixmap::fromImage(img));
     ui->label_2->setPixmap(QPixmap::fromImage(img_2));
     ui->horizontalSlider->setValue(frame_pos);
-    curve_12->setSamples(time_ticks, x, frame_pos);
-    curve_22->setSamples(time_ticks, y, frame_pos);
-    curve_32->setSamples(time_ticks, a, frame_pos);
+    curve_11->setSamples(time_ticks, x, frame_pos);
+    curve_21->setSamples(time_ticks, y, frame_pos);
+    curve_31->setSamples(time_ticks, a, frame_pos);
+    curve_12->setSamples(time_ticks, avg_x, frame_pos);
+    curve_22->setSamples(time_ticks, avg_y, frame_pos);
+    curve_32->setSamples(time_ticks, avg_a, frame_pos);
 //    qDebug()<<frame_pos;
     ui->qwtPlot->replot();
     ui->qwtPlot_2->replot();
@@ -222,6 +226,7 @@ void MainWindow::on_actionreset_triggered()
         ui->label_2->setText(tr("-: Video :-"));
     }
 }
+
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {

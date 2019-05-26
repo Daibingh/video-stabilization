@@ -24,4 +24,3 @@ FORMS += window.ui \
 RESOURCES += \
     res.qrc
 
-DISTFILES +=

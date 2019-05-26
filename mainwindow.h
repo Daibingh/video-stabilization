@@ -20,7 +20,7 @@
 #include <queue>
 #include <fstream>
 
-#define write_data
+//#define write_data
 
 
 const int SMOOTHING_RADIUS = 50; // In frames. The larger the more stable the video, but less reactive to sudden panning
@@ -41,6 +41,8 @@ public:
     Mat scaled_frame_2;
     Mat frame_stabilized;
     int ms_delay;
+    int width, height;
+    int rate;
     float play_scale;
     QImage img, img_2;
     vector<double> x;
@@ -53,11 +55,16 @@ public:
     bool stop = false;
     bool reset = false;
 
-    void set_info(const VideoCapture& cap, float play_scale, int ms_delay)
+    VideoWriter out;
+
+    void set_info(const VideoCapture& cap, float play_scale, int ms_delay, int width, int height, int rate)
     {
         this->cap = cap;
         this->play_scale = play_scale;
         this->ms_delay = ms_delay;
+        this->width = width;
+        this->height = height;
+        this->rate = rate;
         //        qDebug()<<ms_delay;
     }
 
@@ -66,6 +73,8 @@ public:
         frame.release();
         scaled_frame.release();
         scaled_frame_2.release();
+        frame_stabilized.release();
+        out.release();
     }
 
     void clear_data()
@@ -95,6 +104,7 @@ public slots:
         f2<<"x,y,a"<<endl;
         f3<<"dx,dy,da"<<endl;
 #endif
+        out.open("out.avi",CV_FOURCC('M','J','P','G'), rate, Size(width, height));
         clear_data();
 
         queue<Mat> frames;
@@ -191,6 +201,7 @@ public slots:
 
                 // Scale image to remove black border artifact
                 fixBorder(frame_stabilized);
+                out.write(frame_stabilized);
 
                 //            cv::resize(frame, scaled_frame, cv::Size(0, 0), play_scale, play_scale);
                 cv::resize(frame_show_origin_pts, scaled_frame, cv::Size(0, 0), play_scale, play_scale);
@@ -200,7 +211,8 @@ public slots:
                 img_2 = QImage(scaled_frame_2.data, scaled_frame_2.cols, scaled_frame_2.rows, scaled_frame_2.step, QImage::Format_RGB888);
 
                 //            emit img_ready(img, x.data(), y.data(), a.data(), i-radius);
-                emit process_ready(img, img_2, avg_x.data(), avg_y.data(), avg_a.data(), i-radius-1);
+                emit process_ready(img, img_2, x.data(), y.data(), a.data(),
+                                   avg_x.data(), avg_y.data(), avg_a.data(), i-radius-1);
                 QThread::msleep(20);
 
                 frames.pop();
@@ -220,8 +232,11 @@ public slots:
     }
 
 signals:
-    void img_ready(const QImage& img, double* x, double* y, double* a, int frame_pos);
-    void process_ready(const QImage& img, const QImage& img_2, double* x, double* y, double* a, int frame_pos);
+//    void img_ready(const QImage& img, double* x, double* y, double* a, int frame_pos);
+    void process_ready(const QImage& img, const QImage& img_2,
+                       double* x, double* y, double* a,
+                       double* avg_x, double* avg_y, double* avg_a,
+                       int frame_pos);
     void finished();
 };
 
@@ -269,8 +284,9 @@ public:
 public slots:
     void on_actionopen_triggered();
     void on_actionstart_triggered();
-    void show_img(const QImage& img, double* x, double* y, double* a, int frame_pos);
-    void handle_process_ready(const QImage& img, const QImage& img_2, double* x, double* y, double* a, int frame_pos);
+//    void show_img(const QImage& img, double* x, double* y, double* a, int frame_pos);
+    void handle_process_ready(const QImage& img, const QImage& img_2, double* x, double* y, double* a,
+                              double* avg_x, double* avg_y, double* avg_a, int frame_pos);
     void handle_finished();
     void on_actionradius_triggered();
     void on_actionstop_triggered();
