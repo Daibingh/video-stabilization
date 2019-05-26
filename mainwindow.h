@@ -85,10 +85,12 @@ public:
 #ifdef write_data
         ofstream f1;
         ofstream f2;
+        ofstream f3;
         f1.open("xya.txt", fstream::out);
         f2.open("avg_xya.txt", fstream::out);
         f1<<"x,y,a"<<endl;
         f2<<"x,y,a"<<endl;
+        f2<<"dx,dy,da"<<endl;
 #endif
         clear_data();
 
@@ -149,9 +151,8 @@ public:
             f1<<i-1<<","<<x[i-1]<<","<<y[i-1]<<","<<a[i-1]<<endl;
     #endif
             // Move to next frame
+            frames.push(prev);
             curr.copyTo(prev);
-
-            frames.push(curr);
 
             cout<<i<<": "<<frames.size()<<endl;
             if(i<=radius) continue;
@@ -179,6 +180,7 @@ public:
             cout<<pos<<": "<<dx_smoothed<<", "<<dy_smoothed<<", "<<da_smoothed<<endl;
     #ifdef write_data
             f2<<pos<<","<<avg_x[pos]<<","<<avg_y[pos]<<","<<avg_a[pos]<<endl;
+            f3<<pos<<","<<dx_smoothed<<","<<dy_smoothed<<","<<da_smoothed<<endl;
     #endif
             T = getTransform(dx_smoothed, dy_smoothed, da_smoothed);
 
@@ -251,7 +253,7 @@ public:
 #ifdef write_data
       f1.close();
       f2.close();
-
+      f3.close();
 #endif
     }
 
