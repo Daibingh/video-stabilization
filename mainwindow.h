@@ -158,19 +158,13 @@ public:
             curr.copyTo(prev);
 
 //            cout<<i<<": "<<frames.size()<<endl;
-            if(i<=radius) continue;
+            if(frames.size()<=radius) continue;
 
             Mat frame_show_origin = frames.front();
             Mat frame_show_origin_pts;
-            frames.pop();
-            pts_que.pop();
 
             frame_show_origin.copyTo(frame_show_origin_pts);
             draw_pornts(frame_show_origin_pts, pts_que.front());
-
-            cv::resize(frame_show_origin_pts, scaled_frame, cv::Size(0, 0), play_scale, play_scale);
-            img = QImage(scaled_frame.data, scaled_frame.cols, scaled_frame.rows, scaled_frame.step, QImage::Format_RGB888);      
-
 
             // real-time smooth
             smooth_one_point(x, y, a, avg_x, avg_y, avg_a, radius);
@@ -184,14 +178,13 @@ public:
             dy_smoothed = avg_y[pos] + y[pos+1] - 2*y[pos];
             da_smoothed = avg_a[pos] + a[pos+1] - 2*a[pos];
 //            cout<<pos<<": "<<dx_smoothed<<", "<<dy_smoothed<<", "<<da_smoothed<<endl;
+
+            T2 = getTransform(dx_smoothed, dy_smoothed, da_smoothed);
     #ifdef write_data
             f2<<pos<<","<<avg_x[pos]<<","<<avg_y[pos]<<","<<avg_a[pos]<<endl;
             f3<<pos<<","<<dx_smoothed<<","<<dy_smoothed<<","<<da_smoothed<<endl;
-    #endif
-            T2 = getTransform(dx_smoothed, dy_smoothed, da_smoothed);
-
             f4<<T2<<endl;
-
+    #endif
             warpAffine(frame_show_origin, frame_stabilized, T2, frame_show_origin.size(), INTER_LINEAR, BORDER_REPLICATE);
 
 
@@ -199,6 +192,8 @@ public:
             fixBorder(frame_stabilized);
 
 //            cv::resize(frame, scaled_frame, cv::Size(0, 0), play_scale, play_scale);
+            cv::resize(frame_show_origin_pts, scaled_frame, cv::Size(0, 0), play_scale, play_scale);
+            img = QImage(scaled_frame.data, scaled_frame.cols, scaled_frame.rows, scaled_frame.step, QImage::Format_RGB888);
             cv::resize(frame_stabilized, scaled_frame_2, cv::Size(0, 0), play_scale, play_scale);
 //            img = QImage(scaled_frame.data, scaled_frame.cols, scaled_frame.rows, scaled_frame.step, QImage::Format_RGB888);
             img_2 = QImage(scaled_frame_2.data, scaled_frame_2.cols, scaled_frame_2.rows, scaled_frame_2.step, QImage::Format_RGB888);
@@ -206,6 +201,9 @@ public:
 //            emit img_ready(img, x.data(), y.data(), a.data(), i-radius);
             emit process_ready(img, img_2, avg_x.data(), avg_y.data(), avg_a.data(), i-radius-1);
             QThread::msleep(20);
+
+            frames.pop();
+            pts_que.pop();
 
         }
 
