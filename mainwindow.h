@@ -88,9 +88,10 @@ public:
         ofstream f3;
         f1.open("xya.txt", fstream::out);
         f2.open("avg_xya.txt", fstream::out);
+        f3.open("dxya_sm.txt", fstream::out);
         f1<<"x,y,a"<<endl;
         f2<<"x,y,a"<<endl;
-        f2<<"dx,dy,da"<<endl;
+        f3<<"dx,dy,da"<<endl;
 #endif
         clear_data();
 
