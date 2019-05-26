@@ -150,11 +150,10 @@ public:
             y.push_back(yy+=dy);
             a.push_back(aa+=da);
     #ifdef write_data
-//            qDebug()<<i<<": "<<x[i-1]<<", "<<y[i-1]<<", "<<a[i-1];
             f1<<i-1<<","<<x[i-1]<<","<<y[i-1]<<","<<a[i-1]<<endl;
     #endif
             // Move to next frame
-            frames.push(prev);
+            frames.push(prev.clone());  // use prev.clone() instead of prev, this is very important!!!
             curr.copyTo(prev);
 
 //            cout<<i<<": "<<frames.size()<<endl;
@@ -206,55 +205,8 @@ public:
             pts_que.pop();
 
         }
-
-//        smooth(x, y, a, avg_x, avg_y, avg_a, radius);
-//        cout<<"radius in player: "<<radius<<endl;
-//        cap.set(CV_CAP_PROP_POS_FRAMES, 0);
-//        Mat T;
-
-//        for( int i = 0; i < x.size()-1; i++)
-//        {
-//            while(stop)
-//            {
-//                if(reset)
-//                {
-//                    clear_data();
-//                    return;
-//                }
-//            }
-//            if(reset)
-//            {
-//                clear_data();
-//                return;
-//            }
-//            bool success = cap.read(frame);
-//            if(!success) break;
-
-//            // Extract transform from translation and rotation angle.
-//            double dx_smoothed, dy_smoothed, da_smoothed;
-//            dx_smoothed = avg_x[i] + x[i+1] - 2*x[i];
-//            dy_smoothed = avg_y[i] + y[i+1] - 2*y[i];
-//            da_smoothed = avg_a[i] + a[i+1] - 2*a[i];
-////            dx_smoothed = avg_x[i+1] - avg_x[i];
-////            dy_smoothed = avg_y[i+1] - avg_y[i];
-////            da_smoothed = avg_a[i+1] - avg_a[i];
-//            cout<<i<<": "<<dx_smoothed<<", "<<dy_smoothed<<", "<<da_smoothed<<endl;
-//            T = getTransform(dx_smoothed, dy_smoothed, da_smoothed);
-
-//            // Apply affine wrapping to the given frame
-//            warpAffine(frame, frame_stabilized, T, frame.size(), INTER_LINEAR, BORDER_REPLICATE);
-
-//            // Scale image to remove black border artifact
-//            fixBorder(frame_stabilized);
-
-//            cv::resize(frame, scaled_frame, cv::Size(0, 0), play_scale, play_scale);
-//            cv::resize(frame_stabilized, scaled_frame_2, cv::Size(0, 0), play_scale, play_scale);
-//            img = QImage(scaled_frame.data, scaled_frame.cols, scaled_frame.rows, scaled_frame.step, QImage::Format_RGB888);
-//            img_2 = QImage(scaled_frame_2.data, scaled_frame_2.cols, scaled_frame_2.rows, scaled_frame_2.step, QImage::Format_RGB888);
-//            emit process_ready(img, img_2, avg_x.data(), avg_y.data(), avg_a.data(), i);
-//            QThread::msleep(ms_delay);
-//        }
         emit finished();
+
 #ifdef write_data
       f1.close();
       f2.close();
