@@ -1,2 +1,3 @@
 video
-build/*.avi
+build
+*.user

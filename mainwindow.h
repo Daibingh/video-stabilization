@@ -18,6 +18,9 @@
 #include "dialog.h"
 #include <QCloseEvent>
 #include <queue>
+#include <fstream>
+
+#define write_data
 
 
 const int SMOOTHING_RADIUS = 50; // In frames. The larger the more stable the video, but less reactive to sudden panning
@@ -78,6 +81,15 @@ public:
  public slots:
     void play()
     {
+
+#ifdef write_data
+        ofstream f1;
+        ofstream f2;
+        f1.open("xya.txt", fstream::out);
+        f2.open("avg_xya.txt", fstream::out);
+        f1<<"x,y,a"<<endl;
+        f2<<"x,y,a"<<endl;
+#endif
         clear_data();
 
         queue<Mat> frames;
@@ -132,9 +144,10 @@ public:
             x.push_back(xx+=dx);
             y.push_back(yy+=dy);
             a.push_back(aa+=da);
-
+    #ifdef write_data
 //            qDebug()<<i<<": "<<x[i-1]<<", "<<y[i-1]<<", "<<a[i-1];
-
+            f1<<i-1<<","<<x[i-1]<<","<<y[i-1]<<","<<a[i-1]<<endl;
+    #endif
             // Move to next frame
             curr.copyTo(prev);
 
@@ -154,6 +167,7 @@ public:
 
             // real-time smooth
             smooth_one_point(x, y, a, avg_x, avg_y, avg_a, radius);
+
 //            Mat T;
 
             cout<<"x.size()="<<x.size()<<", "<<"avg_x.size()="<<avg_x.size()<<endl;
@@ -163,6 +177,9 @@ public:
             dy_smoothed = avg_y[pos] + y[pos+1] - 2*y[pos];
             da_smoothed = avg_a[pos] + a[pos+1] - 2*a[pos];
             cout<<pos<<": "<<dx_smoothed<<", "<<dy_smoothed<<", "<<da_smoothed<<endl;
+    #ifdef write_data
+            f2<<pos<<","<<avg_x[pos]<<","<<y[pos]<<","<<a[pos]<<endl;
+    #endif
             T = getTransform(dx_smoothed, dy_smoothed, da_smoothed);
 
             warpAffine(frame_show_origin, frame_stabilized, T, frame.size(), INTER_LINEAR, BORDER_REPLICATE);
@@ -177,7 +194,7 @@ public:
 
 //            emit img_ready(img, x.data(), y.data(), a.data(), i-radius);
             emit process_ready(img, img_2, avg_x.data(), avg_y.data(), avg_a.data(), i-radius-1);
-            QThread::msleep(15);
+            QThread::msleep(20);
 
             frames.pop();
             pts_que.pop();
@@ -231,6 +248,11 @@ public:
 //            QThread::msleep(ms_delay);
 //        }
         emit finished();
+#ifdef write_data
+      f1.close();
+      f2.close();
+
+#endif
     }
 
 signals:
