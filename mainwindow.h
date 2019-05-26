@@ -178,7 +178,7 @@ public:
             da_smoothed = avg_a[pos] + a[pos+1] - 2*a[pos];
             cout<<pos<<": "<<dx_smoothed<<", "<<dy_smoothed<<", "<<da_smoothed<<endl;
     #ifdef write_data
-            f2<<pos<<","<<avg_x[pos]<<","<<y[pos]<<","<<a[pos]<<endl;
+            f2<<pos<<","<<avg_x[pos]<<","<<avg_y[pos]<<","<<avg_a[pos]<<endl;
     #endif
             T = getTransform(dx_smoothed, dy_smoothed, da_smoothed);
 
