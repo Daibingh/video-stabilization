@@ -86,9 +86,11 @@ public:
         ofstream f1;
         ofstream f2;
         ofstream f3;
+        ofstream f4;
         f1.open("xya.txt", fstream::out);
         f2.open("avg_xya.txt", fstream::out);
         f3.open("dxya_sm.txt", fstream::out);
+        f4.open("T.txt", fstream::out);
         f1<<"x,y,a"<<endl;
         f2<<"x,y,a"<<endl;
         f3<<"dx,dy,da"<<endl;
@@ -96,6 +98,7 @@ public:
         clear_data();
 
         queue<Mat> frames;
+        queue<vector<cv::Point2f> > pts_que;
 
         cap.set(CV_CAP_PROP_POS_FRAMES, 0);
         int n_frames = int(cap.get(CAP_PROP_FRAME_COUNT));
@@ -128,9 +131,8 @@ public:
                 return;
             }
 
-            queue<vector<cv::Point2f> > pts_que;
-
             vector<cv::Point2f> pts;
+
             double dx, dy, da;
             // Read next frame
             bool success = cap.read(curr);
@@ -155,11 +157,14 @@ public:
             frames.push(prev);
             curr.copyTo(prev);
 
-            cout<<i<<": "<<frames.size()<<endl;
+//            cout<<i<<": "<<frames.size()<<endl;
             if(i<=radius) continue;
 
             Mat frame_show_origin = frames.front();
             Mat frame_show_origin_pts;
+            frames.pop();
+            pts_que.pop();
+
             frame_show_origin.copyTo(frame_show_origin_pts);
             draw_pornts(frame_show_origin_pts, pts_que.front());
 
@@ -170,22 +175,25 @@ public:
             // real-time smooth
             smooth_one_point(x, y, a, avg_x, avg_y, avg_a, radius);
 
-//            Mat T;
+            Mat T2;
 
-            cout<<"x.size()="<<x.size()<<", "<<"avg_x.size()="<<avg_x.size()<<endl;
+//            cout<<"x.size()="<<x.size()<<", "<<"avg_x.size()="<<avg_x.size()<<endl;
             double dx_smoothed, dy_smoothed, da_smoothed;
             int pos = x.size() - radius-1;
             dx_smoothed = avg_x[pos] + x[pos+1] - 2*x[pos];
             dy_smoothed = avg_y[pos] + y[pos+1] - 2*y[pos];
             da_smoothed = avg_a[pos] + a[pos+1] - 2*a[pos];
-            cout<<pos<<": "<<dx_smoothed<<", "<<dy_smoothed<<", "<<da_smoothed<<endl;
+//            cout<<pos<<": "<<dx_smoothed<<", "<<dy_smoothed<<", "<<da_smoothed<<endl;
     #ifdef write_data
             f2<<pos<<","<<avg_x[pos]<<","<<avg_y[pos]<<","<<avg_a[pos]<<endl;
             f3<<pos<<","<<dx_smoothed<<","<<dy_smoothed<<","<<da_smoothed<<endl;
     #endif
-            T = getTransform(dx_smoothed, dy_smoothed, da_smoothed);
+            T2 = getTransform(dx_smoothed, dy_smoothed, da_smoothed);
 
-            warpAffine(frame_show_origin, frame_stabilized, T, frame.size(), INTER_LINEAR, BORDER_REPLICATE);
+            f4<<T2<<endl;
+
+            warpAffine(frame_show_origin, frame_stabilized, T2, frame_show_origin.size(), INTER_LINEAR, BORDER_REPLICATE);
+
 
             // Scale image to remove black border artifact
             fixBorder(frame_stabilized);
@@ -199,8 +207,6 @@ public:
             emit process_ready(img, img_2, avg_x.data(), avg_y.data(), avg_a.data(), i-radius-1);
             QThread::msleep(20);
 
-            frames.pop();
-            pts_que.pop();
         }
 
 //        smooth(x, y, a, avg_x, avg_y, avg_a, radius);
@@ -255,6 +261,7 @@ public:
       f1.close();
       f2.close();
       f3.close();
+      f4.close();
 #endif
     }
 
