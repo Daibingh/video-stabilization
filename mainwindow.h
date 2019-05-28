@@ -96,10 +96,12 @@ public slots:
         ofstream f2;
         ofstream f3;
         ofstream f4;
+        ofstream f5;
         f1.open("xya.txt", fstream::out);
         f2.open("avg_xya.txt", fstream::out);
         f3.open("dxya_sm.txt", fstream::out);
         f4.open("T.txt", fstream::out);
+        f5.open("T_2.txt", fstream::out);
         f1<<"x,y,a"<<endl;
         f2<<"x,y,a"<<endl;
         f3<<"dx,dy,da"<<endl;
@@ -124,9 +126,12 @@ public slots:
         double xx = 0;
         double yy = 0;
         double aa = 0;
-
-        for(int i=1; i<n_frames-1+radius; i++)
+        bool success = true;
+//        bool over = false;
+        int i=0;
+        while(true)  //i<n_frames-1+radius
         {
+            i++;
             while(stop)
             {
                 if(reset)
@@ -141,14 +146,18 @@ public slots:
                 return;
             }
 
-            if(i < n_frames-1)
+            if(success)
             {
                 vector<cv::Point2f> pts;
                 double dx, dy, da;
 
                 // Read next frame
-                bool success = cap.read(curr);
-                if(!success) break;
+                success = cap.read(curr);
+                if(!success)
+                {
+                    cout<<"read failed at "<<i<<endl;
+                    continue;
+                }
                 Mat T = get_transT(prev, curr, pts);
 
                 pts_que.push(pts);
@@ -163,6 +172,7 @@ public slots:
                 a.push_back(aa+=da);
     #ifdef write_data
                 f1<<i-1<<","<<x[i-1]<<","<<y[i-1]<<","<<a[i-1]<<endl;
+                f4<<T<<endl;
     #endif
                 // Move to next frame
                 frames.push(prev.clone());  // use prev.clone() instead of prev, this is very important!!!
@@ -180,21 +190,37 @@ public slots:
                 draw_pornts(frame_show_origin_pts, pts_que.front());
 
                 // real-time smooth
-                smooth_one_point(x, y, a, avg_x, avg_y, avg_a, radius);
+                smooth_one_point
+                        (x, y, a, avg_x, avg_y, avg_a, radius);
 
                 //            cout<<"x.size()="<<x.size()<<", "<<"avg_x.size()="<<avg_x.size()<<endl;
                 double dx_smoothed, dy_smoothed, da_smoothed;
-                int pos = i - radius-1;
-                dx_smoothed = avg_x[pos] + x[pos+1] - 2*x[pos];
-                dy_smoothed = avg_y[pos] + y[pos+1] - 2*y[pos];
-                da_smoothed = avg_a[pos] + a[pos+1] - 2*a[pos];
+                int pos = avg_a.size()-1;
+//                dx_smoothed = avg_x[pos] + x[pos+1] - 2*x[pos];
+//                dy_smoothed = avg_y[pos] + y[pos+1] - 2*y[pos];
+//                da_smoothed = avg_a[pos] + a[pos+1] - 2*a[pos];
+
+                cout<<"frames.size()="<<frames.size()<<", "<<"pos="<<pos<<", "<<"avg_a.size()="<<avg_a.size()<<endl;
+
+                if(pos>0)
+                {
+                    dx_smoothed = avg_x[pos] - x[pos-1];
+                    dy_smoothed = avg_y[pos] - y[pos-1];
+                    da_smoothed = avg_a[pos] - a[pos-1];
+                }
+                else
+                {
+                    dx_smoothed = avg_x[0];
+                    dy_smoothed = avg_y[0];
+                    da_smoothed = avg_a[0];
+                }
                 //            cout<<pos<<": "<<dx_smoothed<<", "<<dy_smoothed<<", "<<da_smoothed<<endl;
 
                 T2 = getTransform(dx_smoothed, dy_smoothed, da_smoothed);
     #ifdef write_data
                 f2<<pos<<","<<avg_x[pos]<<","<<avg_y[pos]<<","<<avg_a[pos]<<endl;
                 f3<<pos<<","<<dx_smoothed<<","<<dy_smoothed<<","<<da_smoothed<<endl;
-                f4<<T2<<endl;
+                f5<<T2<<endl;
     #endif
                 warpAffine(frame_show_origin, frame_stabilized, T2, frame_show_origin.size(), INTER_LINEAR, BORDER_REPLICATE);
 
@@ -213,10 +239,15 @@ public slots:
                 //            emit img_ready(img, x.data(), y.data(), a.data(), i-radius);
                 emit process_ready(img, img_2, x.data(), y.data(), a.data(),
                                    avg_x.data(), avg_y.data(), avg_a.data(), i-radius-1);
-                QThread::msleep(20);
+                QThread::msleep(10);
 
                 frames.pop();
                 pts_que.pop();
+
+                if(frames.empty())
+                {
+                    break;
+                }
             }
 
 
@@ -228,6 +259,7 @@ public slots:
         f2.close();
         f3.close();
         f4.close();
+        f5.close();
 #endif
     }
 

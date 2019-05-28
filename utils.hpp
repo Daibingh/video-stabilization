@@ -101,7 +101,7 @@ inline void smooth_one_point(const vector<double>& x, const vector<double>& y, c
      double sum_a = 0;
      int count = 0;
 
-     int pos = x.size()-radius-1;
+     int pos = avg_a.size();
 
      for(int j=-radius; j <= radius; j++) {
          if(pos+j >= 0 && pos+j < x.size()) {
