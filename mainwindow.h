@@ -239,7 +239,7 @@ public slots:
                 //            emit img_ready(img, x.data(), y.data(), a.data(), i-radius);
                 emit process_ready(img, img_2, x.data(), y.data(), a.data(),
                                    avg_x.data(), avg_y.data(), avg_a.data(), i-radius-1);
-                QThread::msleep(10);
+                QThread::msleep(5);
 
                 frames.pop();
                 pts_que.pop();
